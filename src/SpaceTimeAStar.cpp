@@ -330,6 +330,53 @@ Path SpaceTimeAStar::findShortestPath(ConstraintTable& constraint_table, const p
 			// generate (maybe temporary) node
 			auto next = new AStarNode(next_location, next_g_val, next_h_val,
 									  curr, next_timestep, next_internal_conflicts, false);
+			if (curr->parent != nullptr && curr->location != next_location)
+			{
+				int curr_direction  = -1;
+				int next_direction = -1;
+				int current_temp =  curr->parent->location - curr->location;
+				if (current_temp == 1)
+				{
+					curr_direction = 3;
+				}
+				else if (current_temp == -1)
+				{
+					curr_direction = 1;
+				}
+				else if (current_temp > 1)
+				{
+					curr_direction = 0;
+				}
+				else 
+				{
+					curr_direction = 2;
+				}
+				int next_temp = curr->location - next_location;
+				if (next_temp == 1)
+				{
+					next_direction = 3;
+				}
+				else if (next_temp == -1)
+				{
+					next_direction = 1;
+				}
+				else if (next_temp > 1)
+				{
+					next_direction = 0;
+				}
+				else 
+				{
+					next_direction = 2;
+				}
+				int rotate = curr->rotate + abs(next_direction - curr_direction);
+				if (rotate == 3)
+					rotate =1;
+				next->rotate = curr->rotate + rotate;
+			}
+			else
+			{
+				next->rotate = curr->rotate;
+			}
 			if (next_location == goal_location && curr->location == goal_location)
 				next->wait_at_goal = true;
 			keep = constraint_table.updateUnsatisfiedPositiveConstraintSet(curr->unsatisfied_positive_constraint_sets, next->unsatisfied_positive_constraint_sets, next_location, next_timestep);
@@ -623,6 +670,98 @@ Path SpaceTimeAStar::findPath(ConstraintTable& constraint_table, const pair<int,
 	return path;
 }
 
+bool SpaceTimeAStar::checkReachable(int end, const ConstraintTable& constraint_table, int timestep)
+{
+	if (constraint_table.length_min >= MAX_TIMESTEP || constraint_table.length_min > constraint_table.length_max || // the agent cannot reach its goal location
+		constraint_table.constrained(start_location, 0)) // the agent cannot stay at its start location
+	{
+		return false;
+	}
+	if (constraint_table.constrained(end, timestep))
+	{
+		return false;
+	}
+
+	auto root = new AStarNode(start_location, 0, compute_heuristic(start_location, end), nullptr, 0);
+	root->open_handle = open_list.push(root);  // add root to heap
+	allNodes_table.insert(root);       // add root to hash_table (nodes)
+
+	AStarNode* curr = nullptr;
+	while (!open_list.empty())
+	{
+		curr = open_list.top(); open_list.pop();
+		if (curr->location == end && curr->g_val == timestep)
+		{
+			releaseNodes();
+			return true;
+		}
+		//we want the children's g+h = f <= timestep
+		//therefore is curr's g+h+1 <= timestep
+		int heuristicBound = timestep - curr->g_val - 1;
+		list<int> next_locations = instance.getNeighbors(curr->location);
+		next_locations.emplace_back(curr->location);
+		//try every possible move
+		for (int next_location : next_locations)
+		{
+			if (compute_heuristic(next_location, end) <= heuristicBound && 
+				!constraint_table.constrained(next_location, curr->g_val+1) &&
+				!constraint_table.constrained(curr->location, next_location, curr->g_val+1)) //valid move
+			{
+				auto next = new AStarNode(next_location, curr->g_val+1, compute_heuristic(next_location, end), curr, curr->g_val+1);
+				auto it = allNodes_table.find(next);
+				if (it == allNodes_table.end())
+				{  // add the newly generated node to heap and hash table
+					next->open_handle = open_list.push(next);
+					allNodes_table.insert(next);
+				}
+				else
+				{  // update existing node's g_val if needed (only in the heap)
+					delete next;  // not needed anymore -- we already generated it before
+					auto existing_next = *it;
+					if (existing_next->g_val > curr->g_val+1)
+					{
+						existing_next->g_val = curr->g_val+1;
+						// existing_next->timestep = next_timestep; // Idon't think we need this?
+						open_list.increase(existing_next->open_handle);
+					}
+				}
+				// auto child = closed.rbegin();
+				// bool find = false;
+				// for (; child != closed.rend() && ((*child)->g_val == curr->g_val + 1); ++child)
+				// {
+				// 	if ((*child)->location == next_location) // If the child node exists
+				// 	{
+				// 		find = true;
+				// 		break;
+				// 	}
+				// }
+				// if (!find) // Else generate a new mdd node
+				// {
+				// 	auto childNode = new AStarNode(next_location, curr->g_val+1, compute_heuristic(next_location, end), curr, curr->g_val+1);
+				// 	open.push(childNode);
+				// 	closed.push_back(childNode);
+				// 	all_nodes.push_back(childNode);
+				// }
+				
+			}
+		}
+	}
+	releaseNodes();
+	// while (!open.empty())
+	// {
+	// 	open.pop();
+	// }
+	// for (auto& node : all_nodes)
+	// {
+	// 	delete node;
+	// }
+	
+	// open.clear();
+	// closed.clear();
+	// all_nodes.clear();
+	return false;
+}
+
 int SpaceTimeAStar::getTravelTime(int end, const ConstraintTable& constraint_table, int upper_bound)
 {
 	int length = MAX_TIMESTEP;
@@ -641,6 +780,11 @@ int SpaceTimeAStar::getTravelTime(int end, const ConstraintTable& constraint_tab
 		if (curr->location == end)
 		{
 			length = curr->g_val;
+			auto temp = curr->parent;
+			while (temp != nullptr)
+			{
+				temp = temp->parent;
+			}
 			break;
 		}
 		list<int> next_locations = instance.getNeighbors(curr->location);

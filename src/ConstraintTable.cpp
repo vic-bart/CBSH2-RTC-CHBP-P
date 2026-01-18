@@ -108,7 +108,6 @@ void ConstraintTable::copy(const ConstraintTable& other)
 	// we do not copy cat
 }
 
-
 // build the constraint table for the given agent at the given node
 void ConstraintTable::build(const CBSNode& node, int agent)
 {

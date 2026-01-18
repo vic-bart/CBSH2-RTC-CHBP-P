@@ -79,6 +79,16 @@ public:
 	uint64_t time_expanded;
 	uint64_t time_generated;
 
+	// For chosen which pair of node to identify
+	CBSNode* leftChild = nullptr; // the left child
+	CBSNode* rightChild = nullptr; // the right child
+	bool hasLeftChild = false;
+	bool hasRightChild = false;
+	unordered_set<CBSNode*> ancestors; // its ancestors
+	
+	// For help identification
+	vector<int>path_costs; // path cost for each node
+
 
 	void clear();
 	void printConflictGraph(int num_of_agents) const;

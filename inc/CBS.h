@@ -43,6 +43,8 @@ public:
 	int solution_cost = -2;
 	double min_f_val;
 	double focal_list_threshold;
+	int timeout_constraint = -1;
+	bool pruning = true;
 
 	/////////////////////////////////////////////////////////////////////////////////////////
 	// set params
@@ -57,6 +59,7 @@ public:
 	void setBypass(bool b) { bypass = b; } // 2-agent solver for heuristic calculation does not need bypass strategy.
 	void setNodeLimit(int n) { node_limit = n; }
 	void setSavingStats(bool s) { save_stats = s; heuristic_helper.save_stats = s; }
+	void setPrune(bool p) { pruning = p; }
 
 	////////////////////////////////////////////////////////////////////////////////////////////
 	// Runs the algorithm until the problem is solved or time is exhausted 
@@ -152,4 +155,6 @@ private:
 	bool validateSolution() const;
 	inline int getAgentLocation(int agent_id, size_t timestep) const;
 	inline void pushNode(CBSNode* node);
+
+	bool checkSubsumption(CBSNode* n1, CBSNode* n2);
 };

@@ -270,6 +270,15 @@ void CBS::classifyConflicts(CBSNode& node)
 		else if (cardinal1 || cardinal2)
 		{
 			con->priority = conflict_priority::SEMI;
+			if (cardinal2)
+			{
+				int agent = con->a1;
+				con->a1 = con->a2;
+				con->a2 = agent;
+				list<Constraint> c1 = con->constraint1;
+				con->constraint1 = con->constraint2;
+				con->constraint2 = c1;
+			}
 		}
 		else
 		{
@@ -405,6 +414,8 @@ bool CBS::generateChild(CBSNode* node, CBSNode* parent)
 {
 	clock_t t1 = clock();
 	node->parent = parent;
+	node->ancestors = parent->ancestors;
+	node->ancestors.emplace(parent);
 	node->g_val = parent->g_val;
 	node->makespan = parent->makespan;
 	node->depth = parent->depth + 1;
@@ -505,6 +516,12 @@ bool CBS::generateChild(CBSNode* node, CBSNode* parent)
 	}
 
 	assert(!node->paths.empty());
+	// add new info for pruning (path cost)
+	node->path_costs = node->parent->path_costs;
+	for (auto p: node->paths)
+	{
+		node->path_costs[p.first] = p.second.size();
+	}
 	findConflicts(*node);
 	heuristic_helper.computeQuickHeuristics(*node);
 	runtime_generate_child += (double) (clock() - t1) / CLOCKS_PER_SEC;
@@ -604,42 +621,44 @@ void CBS::saveResults(const string& fileName, const string& instanceName) const
                  "total cluster size,#cluster found,#node found bypass,#bypass found,total h value,total fh value,"<<
                  "max num cluster,max cluster size,max second h,max num bypass,"<<
                  "#fh computed,total fh,max fh,"<<
-				 "preprocessing runtime,solver name,instance name" << endl;
+				 "preprocessing runtime,solver name,instance name" << 
+				 ",timeout"<<endl;
 		addHeads.close();
 	}
 
 	ofstream stats(fileName, std::ios::app);
-	stats << runtime << "," <<
-		  num_HL_expanded << "," << num_HL_generated << "," <<
-		  num_LL_expanded << "," << num_LL_generated << "," <<
+		stats << runtime << "," <<
+		num_HL_expanded << "," << num_HL_generated << "," <<
+		num_LL_expanded << "," << num_LL_generated << "," <<
 
-		  solution_cost << "," << min_f_val << "," << dummy_start->g_val << "," << dummy_start->g_val + dummy_start->h_val << "," <<
+		solution_cost << "," << min_f_val << "," << dummy_start->g_val << "," << dummy_start->g_val + dummy_start->h_val << "," <<
 
-		  num_adopt_bypass << "," <<
+		num_adopt_bypass << "," <<
 
-		  num_standard_conflicts << "," << num_rectangle_conflicts << "," << num_corridor_conflicts << "," <<
-		  num_target_conflicts << "," << num_mutex_conflicts << "," <<
+		num_standard_conflicts << "," << num_rectangle_conflicts << "," << num_corridor_conflicts << "," <<
+		num_target_conflicts << "," << num_mutex_conflicts << "," <<
 
-		  heuristic_helper.num_merge_MDDs << "," <<
-		  heuristic_helper.num_solve_2agent_problems << "," <<
-		  heuristic_helper.num_memoization << "," <<
-		  heuristic_helper.runtime_build_dependency_graph << "," <<
-		  heuristic_helper.runtime_solve_MVC << "," <<
+		heuristic_helper.num_merge_MDDs << "," <<
+		heuristic_helper.num_solve_2agent_problems << "," <<
+		heuristic_helper.num_memoization << "," <<
+		heuristic_helper.runtime_build_dependency_graph << "," <<
+		heuristic_helper.runtime_solve_MVC << "," <<
 
-		  runtime_detect_conflicts << "," <<
-		  rectangle_helper.accumulated_runtime << "," << corridor_helper.accumulated_runtime << "," << mutex_helper.accumulated_runtime << "," <<
-		  mdd_helper.accumulated_runtime << "," << runtime_build_CT << "," << runtime_build_CAT << "," <<
-		  runtime_path_finding << "," << runtime_generate_child << "," <<
-          heuristic_helper.runtime_of_computing_second_heuristic << "," << heuristic_helper.num_cluster_solved << "," << heuristic_helper.num_cluster_memorized<< "," <<
-          heuristic_helper.num_mutex_checking << "," <<heuristic_helper.num_mutex_memorized << "," << heuristic_helper.num_second_heuristic_computed << "," <<
-          heuristic_helper.num_second_heuristic_increased << "," <<heuristic_helper.total_second_heuristic_increased << "," <<
-          heuristic_helper.total_cluster_size << "," <<heuristic_helper.num_cluster_detected << "," <<
-          heuristic_helper.num_node_found_bypass<< "," <<heuristic_helper.num_bypass_found << "," <<
-          heuristic_helper.total_h_value << "," <<heuristic_helper.total_fh_value<< ","<<
-          heuristic_helper.max_num_cluster << "," <<heuristic_helper.max_cluster_size<< ","<<
-          heuristic_helper.max_second_h << "," <<heuristic_helper.max_num_bypass << ","<<
-          heuristic_helper.total_fh_computed << ","<<heuristic_helper.total_fh_value << "," <<heuristic_helper.max_fh<< ","<<
-    runtime_preprocessing << "," << getSolverName() << "," << instanceName << endl;
+		runtime_detect_conflicts << "," <<
+		rectangle_helper.accumulated_runtime << "," << corridor_helper.accumulated_runtime << "," << mutex_helper.accumulated_runtime << "," <<
+		mdd_helper.accumulated_runtime << "," << runtime_build_CT << "," << runtime_build_CAT << "," <<
+		runtime_path_finding << "," << runtime_generate_child << "," <<
+		heuristic_helper.runtime_of_computing_second_heuristic << "," << heuristic_helper.num_cluster_solved << "," << heuristic_helper.num_cluster_memorized<< "," <<
+		heuristic_helper.num_mutex_checking << "," <<heuristic_helper.num_mutex_memorized << "," << heuristic_helper.num_second_heuristic_computed << "," <<
+		heuristic_helper.num_second_heuristic_increased << "," <<heuristic_helper.total_second_heuristic_increased << "," <<
+		heuristic_helper.total_cluster_size << "," <<heuristic_helper.num_cluster_detected << "," <<
+		heuristic_helper.num_node_found_bypass<< "," <<heuristic_helper.num_bypass_found << "," <<
+		heuristic_helper.total_h_value << "," <<heuristic_helper.total_fh_value<< ","<<
+		heuristic_helper.max_num_cluster << "," <<heuristic_helper.max_cluster_size<< ","<<
+		heuristic_helper.max_second_h << "," <<heuristic_helper.max_num_bypass << ","<<
+		heuristic_helper.total_fh_computed << ","<<heuristic_helper.total_fh_value << "," <<heuristic_helper.max_fh<< ","<<
+		runtime_preprocessing << "," << getSolverName() << "," << instanceName <<
+		","<<timeout_constraint<< endl;
 	stats.close();
 }
 
@@ -781,6 +800,61 @@ string CBS::getSolverName() const
 	return name;
 }
 
+bool CBS::checkSubsumption(CBSNode* n1, CBSNode* n2) //check whether n1 can subsume n2
+{
+	int agent, x, y, t;
+	constraint_type type;
+	assert(node->constraints.size() > 0);
+	tie(agent, x, y, t, type) = n1->constraints.front();
+
+	// first, all n1's path cost should <= n2's
+	for (int i = 0; i < num_of_agents; i++)
+	{
+		if (n1->path_costs[i] > n2->path_costs[i])
+		{
+			return false;
+		}
+	}
+
+	if (type == constraint_type::POSITIVE_VERTEX || 
+		type == constraint_type::POSITIVE_EDGE || 
+		type == constraint_type::POSITIVE_BARRIER || 
+		type == constraint_type::POSITIVE_RANGE || 
+		type == constraint_type::GLENGTH || 
+		type == constraint_type::LEQLENGTH)
+	{
+		return false;
+	}
+
+	ConstraintTable ct(initial_constraints[agent]);
+	ct.build(*n2, agent);
+
+	if (type == constraint_type::VERTEX)
+	{
+		for (auto con: n1->constraints)
+		{
+			tie(agent, x, y, t, type) = con;
+			if (search_engines[agent]->checkReachable(x, ct, t))
+				return false;
+		}
+	}
+	if (type == constraint_type::EDGE)
+	{
+		if (search_engines[agent]->checkReachable(x, ct, t-1) && search_engines[agent]->checkReachable(y, ct, t))
+				return false;
+	}
+	if (type == constraint_type::RANGE)
+	{
+		y = max(search_engines[agent]->compute_heuristic(paths[agent]->front().location,x),y);
+		for (int time = t; time >= y; time--)
+		{
+			if (search_engines[agent]->checkReachable(x, ct, time))
+				return false;
+		}
+	}
+	return true;
+}
+
 bool CBS::solve(double _time_limit, int _cost_lowerbound, int _cost_upperbound)
 {
 	this->min_f_val = _cost_lowerbound;
@@ -832,43 +906,54 @@ bool CBS::solve(double _time_limit, int _cost_lowerbound, int _cost_upperbound)
 			break;
 		}
 
-		// debug
-		/*if (curr->time_generated == 15 && num_of_agents > 2)
+		// put the pruning check here
+		if (pruning && dummy_start->rightChild != nullptr)
 		{
-			int a1 = 51, a2 = 54;
-			auto mdd1 = mdd_helper.getMDD(*curr, a1, paths[a1]->size());
-			cout << "The mdd of agent " << a1 << endl;
-			mdd1->printNodes();
-			auto mdd2 = mdd_helper.getMDD(*curr, a2, paths[a2]->size());
-			cout << "The mdd of agent " << a2 << endl;
-			mdd2->printNodes();
-			for (int t = 0; t < min(paths[a1]->size(), paths[a2]->size()); t++)
+			bool prune_node = false;
+			CBSNode* compare_node = dummy_start->rightChild;
+			while (compare_node != nullptr && compare_node != curr)
 			{
-				if (paths[a1]->at(t).location == paths[a2]->at(t).location)
-					rectangle_helper.printOverlapArea(paths, t, a1, a2, mdd1, mdd2);
+				if (curr->ancestors.find(compare_node) != curr->ancestors.end())
+				{
+					compare_node = compare_node->rightChild;
+					continue; //no need to check if it is the ancestors
+				}
+				if (curr->parent->rightChild == compare_node)
+				{
+					break; //no need to check if it is the brothers
+				}
+
+				if (checkSubsumption(compare_node,curr)) //if sompare_node subsumes curr
+				{
+					prune_node = true;
+					break;
+				}
+				if (compare_node->parent->leftChild != nullptr)
+				{
+					if (compare_node->parent->leftChild->hasRightChild == false)
+						break;
+					compare_node = compare_node->parent->leftChild->rightChild;
+				}
+				else
+				{
+					break;
+				}
 			}
-			cout << "The constraints " << endl;
-			curr->printConstraints(a1);
-			curr->printConstraints(a2);
-		}*/
-		/*if (curr->time_generated == 1 && num_of_agents > 2)
-		{
-			int a1 = 12, a2 = 23;
-			auto mdd1 = mdd_helper.getMDD(*curr, a1, paths[a1]->size());
-			cout << "The mdd of agent " << a1 << endl;
-			mdd1->printNodes();
-			auto mdd2 = mdd_helper.getMDD(*curr, a2, paths[a2]->size());
-			cout << "The mdd of agent " << a2 << endl;
-			mdd2->printNodes();
-			for (int t = 0; t < min(paths[a1]->size(), paths[a2]->size()); t++)
+			if (prune_node)
 			{
-				if (paths[a1]->at(t).location == paths[a2]->at(t).location)
-					rectangle_helper.printOverlapArea(paths, t, a1, a2, mdd1, mdd2);
+				if (curr->parent->rightChild == curr)
+				{
+					curr->parent->rightChild = nullptr;
+					curr->parent->hasRightChild = false;
+				}
+				if (curr->parent->leftChild == curr)
+				{
+					curr->parent->leftChild = nullptr;
+					curr->parent->hasLeftChild = false;
+				}
+				continue;
 			}
-			cout << "The constraints " << endl;
-			curr->printConstraints(a1);
-			curr->printConstraints(a2);
-		}*/
+		}
 
 		if (!curr->h_computed) // heuristics has not been computed yet
 		{
@@ -885,6 +970,7 @@ bool CBS::solve(double _time_limit, int _cost_lowerbound, int _cost_upperbound)
 			{  // timeout
 				solution_cost = -1;
 				solution_found = false;
+				timeout_constraint = std::get<0>(curr->constraints.front());
 				break;
 			}
 			if (!succ) // no solution, so prune this node
@@ -964,6 +1050,9 @@ bool CBS::solve(double _time_limit, int _cost_lowerbound, int _cost_upperbound)
 			{
 				child[0]->constraints = curr->conflict->constraint1;
 				child[1]->constraints = curr->conflict->constraint2;
+				int agent, x, y, t;
+				constraint_type type;
+				tie(agent, x, y, t, type) = child[1]->constraints.front();
 				if (curr->conflict->type == conflict_type::RECTANGLE && rectangle_helper.strategy == rectangle_strategy::DR)
 				{
 					int i = (bool)(random_tie_breaker());
@@ -1014,6 +1103,7 @@ bool CBS::solve(double _time_limit, int _cost_lowerbound, int _cost_upperbound)
 					curr->unknownConf = child[i]->unknownConf;
 					curr->tie_breaking = child[i]->tie_breaking;
 					curr->conflict = nullptr;
+					curr->path_costs = child[i]->path_costs;
 					for (const auto& path : child[i]->paths) // update paths
 					{
 						auto p = curr->paths.begin();
@@ -1056,6 +1146,16 @@ bool CBS::solve(double _time_limit, int _cost_lowerbound, int _cost_upperbound)
 				{
 					if (solved[i])
 					{
+						if (i == 0)
+						{
+							child[i]->parent->leftChild = child[i];
+							child[i]->parent->hasLeftChild = true;
+						}
+						else
+						{
+							child[i]->parent->rightChild = child[i];
+							child[i]->parent->hasRightChild = true;
+						}
 						pushNode(child[i]);
 						if (screen > 1)
 						{
@@ -1063,6 +1163,8 @@ bool CBS::solve(double _time_limit, int _cost_lowerbound, int _cost_upperbound)
 						}
 					}
 				}
+				if (pruning)
+					curr->conflict->prune_priority = conflict_prune_priority::SEEN;
 			}
 		}
 		if (curr->conflict != nullptr)
@@ -1159,6 +1261,7 @@ bool CBS::generateRoot()
 {
 	dummy_start = new CBSNode();
 	dummy_start->g_val = 0;
+	dummy_start->path_costs.resize(num_of_agents);
 	paths.resize(num_of_agents, nullptr);
 
 	mdd_helper.init(num_of_agents);
@@ -1194,6 +1297,7 @@ bool CBS::generateRoot()
 				return false;
 			}
 			paths[i] = &paths_found_initially[i];
+			dummy_start->path_costs[i] = paths[i]->size();
 			dummy_start->makespan = max(dummy_start->makespan, paths_found_initially[i].size() - 1);
 			dummy_start->g_val += (int) paths_found_initially[i].size() - 1;
 			num_LL_expanded += search_engines[i]->num_expanded;
@@ -1205,6 +1309,7 @@ bool CBS::generateRoot()
 		for (int i = 0; i < num_of_agents; i++)
 		{
 			paths[i] = &paths_found_initially[i];
+			dummy_start->path_costs[i] = paths[i]->size();
 			dummy_start->makespan = max(dummy_start->makespan, paths_found_initially[i].size() - 1);
 			dummy_start->g_val += (int) paths_found_initially[i].size() - 1;
 		}

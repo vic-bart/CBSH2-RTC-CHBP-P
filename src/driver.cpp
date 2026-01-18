@@ -193,6 +193,8 @@ int main(int argc, char** argv)
     if (cbs.solution_found && vm.count("outputPaths"))
         cbs.savePaths(vm["outputPaths"].as<string>());
 	cbs.clearSearchEngines();
+	if (!cbs.solution_found)
+			return 2;
 	return 0;
 
 }

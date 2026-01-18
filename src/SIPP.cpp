@@ -213,6 +213,11 @@ void SIPP::generateChild(const Interval& interval, SIPPNode* curr, int next_loca
 	delete next;  // not needed anymore -- we already generated it before
 }
 
+bool SIPP::checkReachable(int end, const ConstraintTable& constraint_table, int timestep)
+{
+	return true;
+}
+
 // TODO:: currently this is implemented in A*, not SIPP
 int SIPP::getTravelTime(int end, const ConstraintTable& constraint_table, int upper_bound)
 {

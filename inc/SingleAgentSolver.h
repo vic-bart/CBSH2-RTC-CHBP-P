@@ -15,6 +15,8 @@ public:
 	bool in_openlist = false;
 	bool wait_at_goal; // the action is to wait at the goal vertex or not. This is used for >length constraints
 	// the following is used to compare nodes in the OPEN list
+	// test for less rotate
+	int rotate = 0;
 	struct compare_node
 	{
 		// returns true if n1 > n2 (note -- this gives us *min*-heap).
@@ -64,6 +66,7 @@ public:
 		timestep = other.timestep;
 		num_of_conflicts = other.num_of_conflicts;
 		wait_at_goal = other.wait_at_goal;
+		rotate = other.rotate;
 	}
 };
 
@@ -90,6 +93,7 @@ public:
 		const vector<Path*>& paths, int agent, int lower_bound) = 0;
 	virtual int getTravelTime(int end, const ConstraintTable& constraint_table, int upper_bound) = 0;
 	virtual string getName() const = 0;
+	virtual bool checkReachable(int end, const ConstraintTable& constraint_table, int timestep) = 0;
 
 	list<int> getNextLocations(int curr) const; // including itself and its neighbors
 	list<int> getNeighbors(int curr) const { return instance.getNeighbors(curr); }

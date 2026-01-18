@@ -93,19 +93,23 @@ std::ostream& operator<<(std::ostream& os, const Conflict& conflict)
 // For all the values below, smaller is better
 bool operator<(const Conflict& conflict1, const Conflict& conflict2) // return true if conflict2 has higher priority
 {
-	if (conflict1.priority == conflict2.priority)
+	if (conflict1.prune_priority == conflict2.prune_priority)
 	{
-		if (conflict1.type == conflict2.type)
+		if (conflict1.priority == conflict2.priority)
 		{
-			if (conflict1.secondary_priority == conflict2.secondary_priority)
+			if (conflict1.type == conflict2.type)
 			{
-				return random_tie_breaker();
+				if (conflict1.secondary_priority == conflict2.secondary_priority)
+				{
+					return random_tie_breaker();
+				}
+				return conflict1.secondary_priority > conflict2.secondary_priority;
 			}
-			return conflict1.secondary_priority > conflict2.secondary_priority;
+			return conflict1.type > conflict2.type;
 		}
-		return conflict1.type > conflict2.type;
+		return conflict1.priority > conflict2.priority;
 	}
-	return conflict1.priority > conflict2.priority;
+	return conflict1.prune_priority > conflict2.prune_priority;
 }
 
 bool operator == (const Conflict& conflict1, const Conflict& conflict2)

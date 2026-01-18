@@ -12,6 +12,8 @@ enum conflict_priority { CARDINAL, SEMI, NON, UNKNOWN, PRIORITY_COUNT };
 enum constraint_type { LEQLENGTH, GLENGTH, RANGE, BARRIER, VERTEX, EDGE, 
 											POSITIVE_VERTEX, POSITIVE_EDGE, POSITIVE_BARRIER, POSITIVE_RANGE };
 
+enum conflict_prune_priority { SEEN, NEW, PRUNE_COUNT };
+
 // enum conflict_selection {RANDOM, EARLIEST, CONFLICTS, MCONSTRAINTS, FCONSTRAINTS, WIDTH, SINGLETONS, AGENTID};
 
 typedef std::tuple<int, int, int, int, constraint_type> Constraint;
@@ -36,6 +38,8 @@ public:
 	conflict_type type;
 	conflict_priority priority = conflict_priority::UNKNOWN;
 	double secondary_priority = 0; // used as the tie-breaking criteria for conflict selection
+
+	conflict_prune_priority prune_priority = conflict_prune_priority::NEW;
 
 	void vertexConflict(int _a1, int _a2, int v, int t)
 	{
